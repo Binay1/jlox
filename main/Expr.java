@@ -4,6 +4,9 @@ package main;
 
 // All of the code here will be used to generate an Abstract Syntax Tree
 abstract class Expr {
+  
+  // The visitor design-pattern is used to add a common functionality to all classes
+  // You can read more about it online.
   interface Visitor<R> {
     R visitBinaryExpr(Binary expr);
 
@@ -14,6 +17,8 @@ abstract class Expr {
     R visitUnaryExpr(Unary expr);
   }
   
+  // all static classes will override this function
+  // we're only using it to print the syntax tree right now
   abstract <R> R accept(Visitor<R> visitor);
   
   // All the classes have different actions for different productions/ rules

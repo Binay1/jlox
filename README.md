@@ -1,16 +1,6 @@
 # jlox
 
-This is my implementation of jlox created while following Robert Nystrom's "Crafting Interpreters".
-In it's current state, the project has a working scanner with a clear lexical grammar that takes the
-source text and converts it to tokens. There is also some code to generate an Abstract Syntax Tree that
-will be used to lay down the syntactical grammar to generate an Abstract Syntax Tree.
+This is my implementation of jlox created while following Robert Nystrom's "Crafting Interpreters". In it's current state, the project has a working scanner and parser. The text is grouped into tokens which are further grouped together into expressions that are represented in the form of an Abstract Syntax tree.
 
-Some explanation of the jargon above: the current workflow of the project is to take the source file, read it
-as a string and convert them to "tokens" (basically atttaching a meaning to groups of text). The next step is 
-to take the tokens and create "expressions" out of them. What that means is to take a series of tokens and
-attach some meaning to them (which, here, means defining the rules on how to evaluate them). 
-This is very similar to the previous step, we're just forming expressions out of tokens instead of tokens out
-of strings of characters. It's a pattern, at every stage we add more and more data to the simple text to make it
-consumable for the interpreter. The way that we evaluate expressions is going to be through an Abstract Syntax Tree
-(more detail on that later, still working on completely understanding it myself).
+Some explanation of the jargon above: the current workflow of the project is to take the source file, read it as a string and convert it to "tokens" (basically atttaching a meaning to groups of text: what type they are, value, etc.). The next step is to take the tokens and create "expressions" out of them. What that means is to take a series of tokens and attach some more meaning to them (grouping them together and defining what the tokens represent in a larger context). This is very similar to the previous step, we're just forming expressions out of sequence of tokens instead of tokens out of sequence of characters. It's a pattern, at every stage we add more and more data (defining what the code that was written by the user means in context of the rules of the language) to the simple text we had in the beginning to make it consumable for the interpreter. The way that we evaluate expressions is going to be through an Abstract Syntax Tree. Evaluation of the expressions is the next step, now that we have a complete scanner and parser. This is where the actual "Interpreter" stuff starts.
 [This is all the progress I have right now. The file will be updated further in future]

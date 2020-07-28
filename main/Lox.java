@@ -9,18 +9,26 @@ import java.nio.file.Paths;
 import java.util.List;
 
 public class Lox {
+  
+  private static final Interpreter interpreter = new Interpreter();
 
   static boolean hadError = false;
+  static boolean hadRuntimeError = false;
+
+  static void runtimeError(RuntimeError error) {
+    System.err.println(error.getMessage() + "\n[line " + error.token.line + "]");
+    hadRuntimeError = true;
+  }
 
   private static void run(String source) {
     Scanner scanner = new Scanner(source);
     List<Token> tokens = scanner.scanTokens();
     Parser parser = new Parser(tokens);
     Expr expression = parser.parse();
-    if(hadError) {
+    if (hadError) {
       return;
     }
-    System.out.println(new AstPrinter().print(expression));
+    interpreter.interpret(expression);
   }
 
   // This will be overloaded a bunch of times to provide details about different kinds of errors
@@ -47,6 +55,10 @@ public class Lox {
     if (hadError) {
       System.exit(65);
     }
+    if (hadRuntimeError) {
+      System.exit(70);
+    }
+
   }
 
   private static void runPrompt() throws IOException {
@@ -60,7 +72,8 @@ public class Lox {
         break;
       }
       run(line);
-      hadError = false;
+      hadError = false; // we do this because there might have been an error in the previous line
+                        // and we don't want that to stop the REPL
     }
   }
 

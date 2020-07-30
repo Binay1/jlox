@@ -5,13 +5,17 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.List;
 
+
+/**
+ * This calss is used to generate classes that represent syntax tree nodes
+ * in the form of statements and expressions
+ */
 public class GenerateAst {
 
 
   public static void defineType(PrintWriter writer, String baseName, String className,
       String fieldList) {
-    writer.println("  static class " + className + " extends " +
-        baseName + " {");
+    writer.println("  static class " + className + " extends " + baseName + " {");
     // Fields.
     writer.println();
     // Store parameters in fields.
@@ -30,8 +34,7 @@ public class GenerateAst {
     writer.println();
     writer.println("    @Override");
     writer.println("    <R> R accept(Visitor<R> visitor) {");
-    writer.println("      return visitor.visit" +
-        className + baseName + "(this);");
+    writer.println("      return visitor.visit" + className + baseName + "(this);");
     writer.println("    }");
     writer.println("  }");
   }
@@ -40,8 +43,8 @@ public class GenerateAst {
     writer.println("  interface Visitor<R> {");
     for (String type : types) {
       String typeName = type.split(":")[0].trim();
-      writer.println("    R visit" + typeName + baseName + "(" +
-          typeName + " " + baseName.toLowerCase() + ");");
+      writer.println("    R visit" + typeName + baseName + "(" + typeName + " "
+          + baseName.toLowerCase() + ");");
     }
     writer.println("  }");
   }
@@ -76,8 +79,14 @@ public class GenerateAst {
     String outputDir = args[0];
 
     defineAst(outputDir, "Expr",
-        Arrays.asList("Binary   : Expr left, Token operator, Expr right",
-            "Grouping : Expr expression", "Literal  : Object value",
-            "Unary    : Token operator, Expr right"));
+        Arrays.asList("Assign   : Token name, Expr value",
+            "Binary   : Expr left, Token operator, Expr right", "Grouping : Expr expression",
+            "Literal  : Object value", "Logical: Expr left, Token operator, Expr right",
+            "Unary: Token operator, Expr right", "Variable : Token name"));
+
+    defineAst(outputDir, "Stmt",
+        Arrays.asList("Block: List<Stmt> statements", "Expression : Expr expression",
+            "If: Expr condition, Stmt thenBranch, Stmt elseBranch", "Print: Expr expression",
+            "Var: Token name, Expr initializer", "While: Expr condition, Stmt body"));
   }
 }

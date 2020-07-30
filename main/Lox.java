@@ -24,11 +24,11 @@ public class Lox {
     Scanner scanner = new Scanner(source);
     List<Token> tokens = scanner.scanTokens();
     Parser parser = new Parser(tokens);
-    Expr expression = parser.parse();
+    List<Stmt> statements = parser.parse();
     if (hadError) {
       return;
     }
-    interpreter.interpret(expression);
+    interpreter.interpret(statements);
   }
 
   // This will be overloaded a bunch of times to provide details about different kinds of errors
@@ -72,8 +72,8 @@ public class Lox {
         break;
       }
       run(line);
-      hadError = false; // we do this because there might have been an error in the previous line
-                        // and we don't want that to stop the REPL
+      hadError = false;  // we do this because there might have been an error in the previous line
+                         // and we don't want that to stop the REPL
     }
   }
 

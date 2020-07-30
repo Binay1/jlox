@@ -1,25 +1,40 @@
 package main;
 
 import java.util.List;
+import java.util.Arrays;
+import java.util.ArrayList;
 import static main.TokenType.*;
 
 // This class takes the tokens and produces a syntax tree according to the grammar rules
 
 /**
  * This is the syntactical grammar that we are using for Lox. We start with the outermost
- * rule(expression) and walk down the ladder. As we make our way through the rules from top to
- * bottom the precedence increases. It might seem confusing that we start evaluation from the rule
- * with the lowest precedence but you should take note that the lower precedence expressions are
- * formed by putting together higher precedence expressions. So, in reality, we are evaluating
- * higher precedence expressions first in every case
+ * rule and walk down the ladder. As we make our way through the rules from top to
+ * bottom the precedence increases (those further down are evaluated first).
+ * It might seem confusing that we start evaluation from the rule with the lowest precedence but
+ * you should take note that the lower precedence rules are formed by putting together higher
+ * precedence rules. So, in reality, we are evaluating higher precedence rules first in every case
  * 
- * expression → equality ;
+ * program → declaration* EOF ;
+ * declaration → varDecl | statement ;
+ * varDecl → "var" IDENTIFIER ( "=" expression )? ";" ;
+ * statement → exprStmt | ifStmt | printStmt | whileStmt | forStmt | block ;
+ * forStmt → "for" "(" ( varDecl | exprStmt | ";" ) expression? ";" expression? ")" statement ;
+ * exprStmt → expression ";" ;
+ * ifStmt    → "if" "(" expression ")" statement ( "else" statement )? ;
+ * printStmt → "print" expression ";" ;
+ * whileStmt → "while" "(" expression ")" statement ;
+ * block → "{" declaration* "}"
+ * expression → assignment ;
+ * assignment → IDENTIFIER "=" assignment | logic_or ;
+ * logic_or → logic_or ("or " logic_and)* ;
+ * logic_and → equality ("and" equality)* ;
  * equality → comparison ( ( "!=" | "==" ) comparison )* ;
  * comparison → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
  * addition → multiplication ( ( "-" | "+" )multiplication )* ;
  * multiplication → unary ( ( "/" | "*" ) unary )* ;
  * unary → ( "!" | "-" ) unary| primary ; 
- * primary → NUMBER | STRING | "false" | "true" | "nil" | "(" expression ")" ;
+ * primary → NUMBER | STRING | "false" | "true" | "nil" | "(" expression ")" | IDENTIFIER ;
  */
 public class Parser {
   
@@ -32,6 +47,19 @@ public class Parser {
 
   Parser(List<Token> tokens) {
     this.tokens = tokens;
+  }
+  
+  private Stmt printStatement() {
+    Expr value = expression();
+    consume(SEMICOLON, "Expect ';' after expression");
+    return new Stmt.Print(value);
+  }
+  
+  private Stmt expressionStatement() {
+    Expr expr = expression();
+    consume(SEMICOLON, "Expect ';' after expression");
+    return new Stmt.Expression(expr);
+    
   }
 
   // Check if we are at end of file
@@ -118,6 +146,132 @@ public class Parser {
     }
     return false;
   }
+  
+  private List<Stmt> block() {
+    List<Stmt> statements = new ArrayList<>();
+    
+    while(!check(RIGHT_BRACE) && !isAtEnd()) {
+      statements.add(declaration());
+    }
+    
+    consume(RIGHT_BRACE, "Expect '}' after block.");
+    return statements;
+  }
+  
+  private Stmt varDeclaration() {
+    Token name = consume(IDENTIFIER, "Expect variable name.");
+    
+    Expr initializer = null;
+    if(match(EQUAL)) {
+      initializer = expression();
+    }
+    
+    consume(SEMICOLON, "Expect ';' after variable declaration.");
+    return new Stmt.Var(name, initializer);
+  }
+  
+  private Stmt forStatement() {
+    consume(LEFT_PAREN, "Expect '(' after 'for'.");
+
+    Stmt initializer;
+    if(match(SEMICOLON)) {
+      initializer=null;
+    } 
+    else if(match(VAR)) {
+      initializer = varDeclaration();
+    } 
+    else {
+      initializer = expressionStatement();
+    }
+    
+    Expr condition = null;
+    if(!check(SEMICOLON)) {
+      condition = expression();
+    }
+    consume(SEMICOLON, "Expect ';' after loop condition.");
+    
+    Expr increment = null;
+    if(!check(RIGHT_PAREN)) {
+      increment = expression();
+    }
+    consume(RIGHT_PAREN, "Expect ')' after for clauses.");
+
+    Stmt body = statement();
+    
+    if (increment!=null) {
+      // add increment to end of body
+      body = new Stmt.Block(Arrays.asList(body, new Stmt.Expression(increment)));
+    }
+    
+    if(condition==null) {
+      condition = new Expr.Literal(true);
+    }
+    
+    body = new Stmt.While(condition, body); // create a while loop with the given condition and body
+    
+    if(initializer!=null) {
+      body = new Stmt.Block(Arrays.asList(initializer, body)); // add initializer to beginning of body
+                                                               // (outside of while loop)
+    }
+    
+    return body;
+    
+  }
+  
+  private Stmt statement() {
+    if(match(FOR)) {
+      return forStatement();
+    }
+    if (match(IF)) {
+      return ifStatement();
+    }
+    if(match(PRINT)) {
+      return printStatement();
+    }
+    if(match(WHILE)) {
+      return whileStatement();
+    }
+    if(match(LEFT_BRACE)) {
+      return new Stmt.Block(block());
+    }
+    return expressionStatement();
+    
+  }
+  
+  private Stmt ifStatement() {
+    
+    consume(LEFT_PAREN, "Expect '(' after 'if'.");
+    Expr condition = expression();
+    consume(RIGHT_PAREN, "Expect ')' after if condition.");
+    Stmt thenBranch = statement();
+    Stmt elseBranch = null;
+    if(match(ELSE)) {
+      elseBranch = statement();
+    }
+    return new Stmt.If(condition, thenBranch, elseBranch);
+  }
+  
+  private Stmt whileStatement() {
+    
+    consume(LEFT_PAREN, "Expect '(' after 'while'.");
+    Expr condition = expression();
+    consume(RIGHT_PAREN, "Expect ')' after condition.");
+    Stmt body = statement();
+    
+    return new Stmt.While(condition, body);
+  }
+  
+  private Stmt declaration() {
+    try {
+      if(match(VAR)) {
+        return varDeclaration();
+      }
+      return statement();
+    } catch(ParseError error) {
+      synchronize();
+      return null;
+    }
+  }
 
   // almost identical to equality(). The only difference is type of operands
   // Check those comments to get a gist of the general process
@@ -191,6 +345,9 @@ public class Parser {
                                                             // throw error
       return new Expr.Grouping(expr);
     }
+    if(match(IDENTIFIER)) {
+      return new Expr.Variable(previous());
+    }
     // we've got an unexpected token
     throw error(peek(), "Expect expression.");
   }
@@ -203,17 +360,57 @@ public class Parser {
     }
     return primary();
   }
+  
+  private Expr and() {
+    Expr expr = equality();
+    
+    while(match(AND)) {
+      Token operator = previous();
+      Expr right = equality();
+      expr = new Expr.Logical(expr, operator, right);
+    }
+    return expr;
+  }
+  
+  private Expr or() {
+    Expr expr = and();
+    
+    while(match(OR)) {
+      Token operator = previous();
+      Expr right = and();
+      expr = new Expr.Logical(expr, operator, right);
+    }
+    return expr;
+  }
+  
+  private Expr assignment() {
+    Expr expr = or(); // parse left side
+    
+    if(match(EQUAL)) { // find equal
+      Token equals = previous();
+      Expr value = assignment();
+      
+      if(expr instanceof Expr.Variable) { // if parsed left-side is a variable
+        Token name  = ((Expr.Variable)expr).name; // we need to cast because at compile-time,
+                                                  // java doesn't know the "type" of expr
+        return new Expr.Assign(name, value); // perform assignment
+      }
+      error(equals, "Invalid assignment target"); // report if it isn't
+    }
+    
+    return expr; // continue on your merry path if you don't find "="
+  }
 
   // lowest precedence, grammatically on top
   private Expr expression() {
-    return equality();
+    return assignment();
   }
   
-  Expr parse() {
-    try {
-      return expression();
-    } catch(ParseError error) {
-        return null;
+  List<Stmt> parse() {
+    List<Stmt> statements = new ArrayList<>();
+    while(!isAtEnd()) {
+      statements.add(declaration());
     }
+    return statements;
   }
 }

@@ -140,7 +140,6 @@ class Scanner {
     while (isAlphaNumeric(peek())) {
       advance();
     }
-
     String text = source.substring(start, current);
     TokenType type = keywords.get(text); // Check if it's a keyword
     if (type == null) {

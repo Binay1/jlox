@@ -8,6 +8,7 @@ import static main.TokenType.*;
 // This class takes the tokens and produces a syntax tree according to the grammar rules
 
 /**
+ * 
  * This is the syntactical grammar that we are using for Lox. We start with the outermost
  * rule and walk down the ladder. As we make our way through the rules from top to
  * bottom the precedence increases (those further down are evaluated first).
@@ -16,9 +17,13 @@ import static main.TokenType.*;
  * precedence rules. So, in reality, we are evaluating higher precedence rules first in every case
  * 
  * program → declaration* EOF ;
- * declaration → varDecl | statement ;
+ * declaration → funDecl | varDecl | statement ;
+ * funDecl  → "fun" function ;
+ * function → IDENTIFIER "(" parameters? ")" block ;
+ * parameters → IDENTIFIER ( "," IDENTIFIER )* ;
  * varDecl → "var" IDENTIFIER ( "=" expression )? ";" ;
- * statement → exprStmt | ifStmt | printStmt | whileStmt | forStmt | block ;
+ * statement → exprStmt | ifStmt | printStmt | returnStmt | whileStmt | forStmt | block ;
+ * returnStmt → "return" expression? ";" ;
  * forStmt → "for" "(" ( varDecl | exprStmt | ";" ) expression? ";" expression? ")" statement ;
  * exprStmt → expression ";" ;
  * ifStmt    → "if" "(" expression ")" statement ( "else" statement )? ;
@@ -33,8 +38,11 @@ import static main.TokenType.*;
  * comparison → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
  * addition → multiplication ( ( "-" | "+" )multiplication )* ;
  * multiplication → unary ( ( "/" | "*" ) unary )* ;
- * unary → ( "!" | "-" ) unary| primary ; 
+ * unary → ( "!" | "-" ) unary| call ;
+ * call → primary ("("arguments?")")* ;
+ * arguments → expression ( "," expression )* ;
  * primary → NUMBER | STRING | "false" | "true" | "nil" | "(" expression ")" | IDENTIFIER ;
+ * 
  */
 public class Parser {
   
@@ -231,11 +239,25 @@ public class Parser {
     if(match(WHILE)) {
       return whileStatement();
     }
+    if (match(RETURN)) {
+      return returnStatement();
+    }
+
     if(match(LEFT_BRACE)) {
       return new Stmt.Block(block());
     }
     return expressionStatement();
     
+  }
+  
+  private Stmt returnStatement() {
+    Token keyword = previous(); // just for error reporting. We have no other use for return keyword
+    Expr value = null;
+    if(!check(SEMICOLON)) { // check to see if we have something to return
+      value = expression();
+    }
+    consume(SEMICOLON, "Expect ';' after return value.");
+    return new Stmt.Return(keyword, value);
   }
   
   private Stmt ifStatement() {
@@ -261,8 +283,29 @@ public class Parser {
     return new Stmt.While(condition, body);
   }
   
+  private Stmt.Function function(String kind) {
+    Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
+    consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
+    List<Token> parameters = new ArrayList<>();
+    if(!check(RIGHT_PAREN)) {
+      do {
+        if (parameters.size() >= 255) {
+          error(peek(), "Cannot have more than 255 parameters.");
+        }        
+        parameters.add(consume(IDENTIFIER, "Expect parameetr name."));
+      } while(match(COMMA));
+    }
+    consume(RIGHT_PAREN, "Expect ')' after parameters.");
+    consume(LEFT_BRACE, "Expect '{' before " + kind + " body.");
+    List<Stmt> body = block();
+    return new Stmt.Function(name, parameters, body);
+  }
+  
   private Stmt declaration() {
     try {
+      if (match(FUN)) {
+        return function("function");
+      }
       if(match(VAR)) {
         return varDeclaration();
       }
@@ -351,6 +394,33 @@ public class Parser {
     // we've got an unexpected token
     throw error(peek(), "Expect expression.");
   }
+  
+  private Expr finishCall(Expr callee) {
+    List<Expr> arguments = new ArrayList<>();
+    if(!check(RIGHT_PAREN)) {
+      do {
+        if (arguments.size() >= 255) {
+          error(peek(), "Cannot have more than 255 arguments.");
+        }
+        arguments.add(expression());
+      } while(match(COMMA));
+    }
+    Token paren = consume(RIGHT_PAREN, "Expect ')' after arguments.");
+    return new Expr.Call(callee, paren, arguments);
+  }
+  
+  private Expr call() {
+    Expr expr = primary();
+    while(true) {
+      if(match(LEFT_PAREN)) {
+        expr = finishCall(expr);
+      }
+      else {
+        break;
+      }
+    }
+    return expr;
+  }
 
   private Expr unary() {
     if (match(BANG, MINUS)) {
@@ -358,7 +428,7 @@ public class Parser {
       Expr right = unary();
       return new Expr.Unary(operator, right);
     }
-    return primary();
+    return call();
   }
   
   private Expr and() {

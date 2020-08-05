@@ -79,7 +79,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     scope.put(name.lexeme, false); // false just means that it isn't initialized yet
   }
   
-  // this method does all the work. It does the job of linking the declaration with the definition
+  // this method does all the work. It does the job of linking the declaration with the usage
   // by passing the distance between the environments where both actions take place
   private void resolveLocal(Expr expr, Token name) {
     for (int i = scopes.size() - 1; i >= 0; i--) {

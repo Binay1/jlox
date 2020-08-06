@@ -6,5 +6,4 @@ The current workflow of the project is to take the source file, read it as a str
 
 # How to use
 
-Fire up your favorite java IDE (I used eclipse to build this) and import the project into it. Run Lox.java without any arguments to run it in a shell-like mode (REPL)
-or provide it with a filepath to your Lox program (you can just write it in a .txt file somewhere).
+Fire up your favorite Java IDE (I used eclipse to build this) and open the project in it (Eclipse doesn't let you "import" the project for some reason. I'm guessing it's because I uploaded just the src directory to the repo. There were probably some hidden files in the base project folder. So for Eclipse, just go File -> Open Projects from File System). Run Lox.java without any arguments to get a shell-like mode (REPL) or provide it with a filepath to your Lox program (you can just write it in a .txt file somewhere). I've only been running it using eclipse so I'll figure out how to compile and run the project straight from cmd and upload instructions soon.

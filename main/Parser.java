@@ -17,7 +17,8 @@ import static main.TokenType.*;
  * precedence rules. So, in reality, we are evaluating higher precedence rules first in every case
  * 
  * program → declaration* EOF ;
- * declaration → funDecl | varDecl | statement ;
+ * declaration → funDecl | varDecl | classDecl | statement ;
+ * classDecl → "class" IDENTIFIER "{" function* "}" ;
  * funDecl  → "fun" function ;
  * function → IDENTIFIER "(" parameters? ")" block ;
  * parameters → IDENTIFIER ( "," IDENTIFIER )* ;
@@ -26,12 +27,12 @@ import static main.TokenType.*;
  * returnStmt → "return" expression? ";" ;
  * forStmt → "for" "(" ( varDecl | exprStmt | ";" ) expression? ";" expression? ")" statement ;
  * exprStmt → expression ";" ;
- * ifStmt    → "if" "(" expression ")" statement ( "else" statement )? ;
+ * ifStmt → "if" "(" expression ")" statement ( "else" statement )? ;
  * printStmt → "print" expression ";" ;
  * whileStmt → "while" "(" expression ")" statement ;
  * block → "{" declaration* "}"
  * expression → assignment ;
- * assignment → IDENTIFIER "=" assignment | logic_or ;
+ * assignment → (call ".")? IDENTIFIER "=" assignment | logic_or ;
  * logic_or → logic_or ("or " logic_and)* ;
  * logic_and → equality ("and" equality)* ;
  * equality → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -39,9 +40,9 @@ import static main.TokenType.*;
  * addition → multiplication ( ( "-" | "+" )multiplication )* ;
  * multiplication → unary ( ( "/" | "*" ) unary )* ;
  * unary → ( "!" | "-" ) unary| call ;
- * call → primary ("("arguments?")")* ;
+ * call → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
  * arguments → expression ( "," expression )* ;
- * primary → NUMBER | STRING | "false" | "true" | "nil" | "(" expression ")" | IDENTIFIER ;
+ * primary → NUMBER | STRING | "false" | "true" | "nil" | "(" expression ")" | "this" | IDENTIFIER ;
  * 
  */
 public class Parser {
@@ -301,8 +302,23 @@ public class Parser {
     return new Stmt.Function(name, parameters, body);
   }
   
+  private Stmt classDeclaration() {
+    Token name = consume(IDENTIFIER, "Expect class name.");
+    consume(LEFT_BRACE, "Expect '{' before class body");
+    
+    List<Stmt.Function> methods = new ArrayList<>();
+    while(!check(RIGHT_BRACE) && !isAtEnd()) {
+      methods.add(function("method"));
+    }
+    consume(RIGHT_BRACE, "Expect '}' after class body");
+    return new Stmt.Class(name, methods);
+  }
+  
   private Stmt declaration() {
     try {
+      if(match(CLASS)) {
+        return classDeclaration();
+      }
       if (match(FUN)) {
         return function("function");
       }
@@ -391,6 +407,9 @@ public class Parser {
     if(match(IDENTIFIER)) {
       return new Expr.Variable(previous());
     }
+    if (match(THIS)) {
+      return new Expr.This(previous());
+    }
     // we've got an unexpected token
     throw error(peek(), "Expect expression.");
   }
@@ -413,7 +432,11 @@ public class Parser {
     Expr expr = primary();
     while(true) {
       if(match(LEFT_PAREN)) {
-        expr = finishCall(expr);
+       expr = finishCall(expr);
+      }
+      else if(match(DOT)) {
+        Token name = consume(IDENTIFIER, "Expect property name after '.'");
+        expr = new Expr.Get(expr, name);
       }
       else {
         break;
@@ -432,8 +455,7 @@ public class Parser {
   }
   
   private Expr and() {
-    Expr expr = equality();
-    
+    Expr expr = equality();   
     while(match(AND)) {
       Token operator = previous();
       Expr right = equality();
@@ -464,6 +486,10 @@ public class Parser {
         Token name  = ((Expr.Variable)expr).name; // we need to cast because at compile-time,
                                                   // java doesn't know the "type" of expr
         return new Expr.Assign(name, value); // perform assignment
+      }
+      else if(expr instanceof Expr.Get) {
+        Expr.Get get = (Expr.Get)expr;
+        return new Expr.Set(get.object, get.name, value);
       }
       error(equals, "Invalid assignment target"); // report if it isn't
     }

@@ -6,79 +6,85 @@ import java.util.Map;
 import java.util.Stack;
 
 /**
- * This class has a very similar process to the interpreter. It goes through the syntax tree
- * and resolves all the variable values for the interpreter instead of evaluating the code
+ * This class has a very similar process to the interpreter. It goes through the syntax tree and
+ * resolves all the variable values for the interpreter instead of evaluating the code. The scopes
+ * defined in this class are in sync withhow the interpreter handles environments at runtime
  */
 class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
-  
-  private enum FunctionType { NONE, FUNCTION }
-  
+
+  private enum FunctionType {
+    NONE, FUNCTION, METHOD, INITIALIZER
+  }
+  private enum ClassType {
+    NONE, CLASS
+  }
+
   private final Interpreter interpreter;
   private final Stack<Map<String, Boolean>> scopes = new Stack<>();
-  // we're only keeping track of this to prevent the usage of a return statement outside
+  // we're only keeping track of these to prevent the usage of "return" or "this" outside
   // a function
   private FunctionType currentFunction = FunctionType.NONE;
+  private ClassType currentClass = ClassType.NONE;
 
 
 
   Resolver(Interpreter interpreter) {
     this.interpreter = interpreter;
   }
-  
+
   private void endScope() {
     scopes.pop();
   }
-  
+
   private void beginScope() {
     scopes.push(new HashMap<String, Boolean>());
   }
-  
+
   private void resolve(Expr expr) {
     expr.accept(this);
   }
-  
+
   private void resolve(Stmt statement) {
     statement.accept(this);
   }
-  
+
   private void resolveFunction(Stmt.Function function, FunctionType type) {
     FunctionType enclosingFunction = currentFunction;
     currentFunction = type;
     beginScope();
-    for(Token param : function.params) {
+    for (Token param : function.params) {
       declare(param);
       define(param);
     }
     resolve(function.body);
     endScope();
     currentFunction = enclosingFunction;
-  } 
-  
+  }
+
   void resolve(List<Stmt> statements) {
-    for(Stmt statement : statements) {
+    for (Stmt statement : statements) {
       resolve(statement);
     }
   }
-  
+
   private void define(Token name) {
     if (scopes.isEmpty()) {
       return;
-    } 
+    }
     scopes.peek().put(name.lexeme, true);
   }
-  
+
   private void declare(Token name) {
     if (scopes.isEmpty()) {
       return;
     }
     Map<String, Boolean> scope = scopes.peek();
-    if(scope.containsKey(name.lexeme)) {
-      Lox.error(name,
-          "Variable with this name already declared in this scope.");
+    if (scope.containsKey(name.lexeme)) {
+      Lox.error(name, "Variable with this name already declared in this scope.");
     }
     scope.put(name.lexeme, false); // false just means that it isn't initialized yet
   }
-  
+
   // this method does all the work. It does the job of linking the declaration with the usage
   // by passing the distance between the environments where both actions take place
   private void resolveLocal(Expr expr, Token name) {
@@ -119,7 +125,10 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     if (currentFunction == FunctionType.NONE) {
       Lox.error(stmt.keyword, "Cannot return from top-level code.");
     }
-    if(stmt.value!=null) {
+    if (stmt.value != null) {
+      if(currentFunction ==FunctionType.INITIALIZER) {
+        Lox.error(stmt.keyword, "Cannot return value from initializer");
+      }
       resolve(stmt.value);
     }
     return null;
@@ -144,7 +153,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   @Override
   public Void visitVarStmt(Stmt.Var stmt) {
     declare(stmt.name);
-    if(stmt.initializer!=null) {
+    if (stmt.initializer != null) {
       resolve(stmt.initializer);
     }
     define(stmt.name);
@@ -161,7 +170,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
   @Override
   public Void visitAssignExpr(Expr.Assign expr) {
     resolve(expr.value); // in case there are other variables in the assignment
-    resolveLocal(expr, expr.name); 
+    resolveLocal(expr, expr.name);
     return null;
   }
 
@@ -207,12 +216,54 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitVariableExpr(Expr.Variable expr) {
-    if (!scopes.isEmpty() &&
-        scopes.peek().get(expr.name.lexeme) == Boolean.FALSE) {
-      Lox.error(expr.name,
-          "Cannot read local variable in its own initializer.");
+    if (!scopes.isEmpty() && scopes.peek().get(expr.name.lexeme) == Boolean.FALSE) {
+      Lox.error(expr.name, "Cannot read local variable in its own initializer.");
     }
     resolveLocal(expr, expr.name);
+    return null;
+  }
+
+  @Override
+  public Void visitClassStmt(Stmt.Class stmt) {
+    ClassType enclosingClass = currentClass;
+    currentClass = ClassType.CLASS;
+    declare(stmt.name);
+    define(stmt.name);
+    beginScope(); // create a new scope for the class
+    scopes.peek().put("this", true); // place "this" in it
+    for (Stmt.Function method : stmt.methods) {
+      FunctionType declaration = FunctionType.METHOD;
+      if(method.name.lexeme.equals("init")) {
+        declaration = FunctionType.INITIALIZER;
+      }
+      resolveFunction(method, declaration);
+    }
+    endScope(); // get rid of it when done
+    currentClass = enclosingClass;
+    return null;
+  }
+
+  @Override
+  public Void visitGetExpr(Expr.Get expr) {
+    resolve(expr.object);
+    return null;
+  }
+
+  @Override
+  public Void visitSetExpr(Expr.Set expr) {
+    resolve(expr.value);
+    resolve(expr.object);
+    return null;
+  }
+
+  @Override
+  public Void visitThisExpr(Expr.This expr) {
+    if (currentClass == ClassType.NONE) {
+      Lox.error(expr.keyword,
+          "Cannot use 'this' outside of a class.");
+      return null;
+    }
+    resolveLocal(expr, expr.keyword);
     return null;
   }
 }

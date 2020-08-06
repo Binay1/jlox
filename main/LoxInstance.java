@@ -19,7 +19,7 @@ class LoxInstance {
     }
     LoxFunction method = klass.findMethod(name.lexeme);
     if (method != null) {
-      return method.bind(this);
+      return method.bind(this); // bind current instance to "this" keyword
     }
     // else throw error
     throw new RuntimeError(name, "Undefined property '" + name.lexeme + "'.");

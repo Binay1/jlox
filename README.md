@@ -86,13 +86,13 @@ We begin a function declaration by using the 'fun' keyword. The arguments are op
 		return arg1>arg2;
 	}
 	
-You don't necessarily need to return anything. The function returns nil by default. A function call is as simple as typing the name and following it with parentheses that contain arguments, like so:
+You don't necessarily have to return something. The function returns nil by default. A function call is as simple as typing the name and following it with parentheses that contain arguments, like so:
 
 	FunName(5,2);
 
 ## Classes
 
-A class, by default, only has methods associated with it. There are no fields. The class only meant to group behavior. Methods are just functions declared within a class that can be accessed by its instances. You don't need to use the 'fun' keyword before declaring a function.
+A class, by default, only has methods associated with it. You can't declare fields when defining a class and there are no fields "associated" with it (basically, no static fields allowed). The class is only meant to group behavior. Methods are just functions declared within a class that can be accessed by its instances. You don't need to use the 'fun' keyword before declaring a method.
 
 	class person {		
 		sayHello() {
@@ -108,7 +108,7 @@ Accessing a method is also simple: just type a dot(.) following the instance nam
 
 	me.sayHello();
 
-The way to attach data is to follow instance name by a dot(.), write the property name and assign a value.
+The way to attach new fields is to follow instance name by a dot(.), write the property name and assign a value.
 
 	me.name = "Binay";
 	
@@ -120,8 +120,43 @@ We can access the instance properties in class methods by using the 'this' keywo
 		}	
 	}
 
-[ The documentation for classes is not yet complete. I still need to add instructions for inheritance and how to define constructors ]
+Coming back to fields, I know that it might seem weird for there to be no structure regarding fields but there is a crucial part of classes that we have not covered yet that wil make you realize that it isn't completely structure-less. Coming to constructors: these methods are run every time an instance is created and are named 'init'. One very helpful usecase is to initialize each object with the required fields like so: 
 
+	class person {
+	  init(name, home) {
+	    this.name = name;
+	    this.home = home;
+	  }
+	
+	  sayHello() {
+	    print this.name + " lives in " + this.home;
+	  }
+	}
+	
+	var me = person("Binay", "Delhi");
+	me.sayHello();
+
+This allows you to make sure that every object has the required data to perform the actions that you have defined. You can also attach other fields to objects individually after they have been initialized and I think that's a great feature to have.
+
+The last part that we have to cover now is inheritance. When declaring a subclass, follow the subclass' name with a lesser-than(<) sign and write the superclass name. You can access the
+superclass' methods by using the 'super' keyword.
+
+	class Doughnut {
+	  cook() {
+	    print "Fry until golden brown.";
+	  }
+	}
+	
+	class BostonCream < Doughnut {
+	  cook() {
+	    super.cook();
+	    print "Pipe full of brownie and coat with chocolate.";
+	  }
+	}
+	
+	BostonCream().cook();
+
+I took the above example from the Crafting Interpreters Book because I was running out of creativity with my person examples.
 
 # How to use
 
